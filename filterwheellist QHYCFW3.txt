@@ -1,0 +1,2 @@
+//Version|Manufacturer|Model|Comment|MapsTo|PlugInDllName|X2Developer|Windows|Mac|Linux|
+2|QHYCCD|QHYCFW3 USB|USB-Mode driver for the QHYCFW3 Filter wheel| |libqhycfw3_usb||1|1|1|
