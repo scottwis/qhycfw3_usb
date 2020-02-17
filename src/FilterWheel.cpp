@@ -1,9 +1,4 @@
-#include <cxxabi.h>
 #include <limits.h>
-#define UNW_LOCAL_ONLY
-#include <libunwind.h>
-#include <stdlib.h>
-
 #include <liscensedinterfaces/basicstringinterface.h>
 #include <liscensedinterfaces/basiciniutilinterface.h>
 #include <liscensedinterfaces/theskyxfacadefordriversinterface.h>
@@ -13,6 +8,7 @@
 #include <liscensedinterfaces/tickcountinterface.h>
 #include <liscensedinterfaces/sberrorx.h>
 #include <stdio.h>
+#include <string>
 #include "FilterWheel.h"
 
 static const char * DRIVER_NAME = "QHYCFW3 USB X2 Filter Wheel Driver";
@@ -45,6 +41,8 @@ public:
         linked(false),
         numPositions(DEFAULT_NUM_POSITIONS),
         instanceNum(instanceNum),
+        moving(false),
+        currentCommand(0),
         pSerial(pSerial),
         pTheSky(pTheSky),
         pSleeper(pSleeper),
@@ -56,32 +54,89 @@ public:
     }
 
     ~Impl() {
-        printf("FilterWheel::Impl::~Impl()\n");
-        /*delete pSerial;
+        delete pSerial;
         delete pTheSky;
         delete pSleeper;
         delete pSettings;
         delete pLogger;
         delete pMutex;
-        delete pTickCounter;*/
+        delete pTickCounter;
     }
 
     void loadSettings() {
         X2MutexLocker lock(pMutex);
+        char buf[NAME_MAX];
+        memset(buf, 0, sizeof(buf));
+        pSettings->readString(PARENT_KEY, PORT_KEY, DEF_PORT_NAME, buf, sizeof(buf));
+        port = buf;
+        numPositions = pSettings->readInt(PARENT_KEY, NUM_POSITIONS_KEY, DEFAULT_NUM_POSITIONS);
+    }
 
-        memset(port, 0, sizeof(port));
-        pSettings->readString(PARENT_KEY, PORT_KEY, DEF_PORT_NAME, port, sizeof(port));
+    int writeAndWaitForEcho(char c) {
+        unsigned long n;
+        int rc = pSerial->writeFile(&c, sizeof(c), n);
 
-        printf("loadSettings: port == %s\n", port);
+        if (rc != SB_OK) {
+            return rc;
+        }
 
-        //numPositions = pSettings->readInt(PARENT_KEY, NUM_POSITIONS_KEY, DEFAULT_NUM_POSITIONS);
+        rc = pSerial->flushTx();
+
+        if (rc != SB_OK) {
+            return rc;
+        }
+
+        char readBuf = 0;
+        rc = pSerial->readFile(&readBuf, sizeof(readBuf), n, 2000);
+
+        if (rc != SB_OK) {
+            return rc;
+        }
+
+        if (n != 1 || readBuf != c) {
+            return ERR_CMDFAILED;
+        }
+
+        return SB_OK;
+    }
+
+    int write(char c) {
+        unsigned long n;
+        int rc = pSerial->writeFile(&c, sizeof(c), n);
+
+        if (rc != SB_OK) {
+            return rc;
+        }
+
+        if (n != sizeof(c)) {
+            return ERR_CMDFAILED;
+        }
+        return SB_OK;
+    }
+
+    int read(char c) {
+        unsigned long n;
+        char buf = 0;
+        int rc = pSerial->readFile(&buf, sizeof(buf), n, 2000);
+
+        if (rc != SB_OK) {
+            return rc;
+        }
+
+        if (n != sizeof(buf) || buf != c) {
+            return ERR_CMDFAILED;
+        }
+
+        return SB_OK;
     }
 
     bool linked;
     int numPositions;
-    //TODO: replace with std::string...
-    char port[NAME_MAX];
+    std::string port;
     const int instanceNum;
+    bool moving;
+    char currentCommand;
+
     SerXInterface * pSerial;
     TheSkyXFacadeForDriversInterface * pTheSky;
     SleeperInterface * pSleeper;
@@ -110,98 +165,30 @@ FilterWheel::FilterWheel(
     pMutex,
     pTickCounter
 )) {
-    printf("FilterWheel::FilterWheel(...) this == %p\n", this);
     m_pImpl->loadSettings();
 }
 
-static void backtrace() {
-    printf("-----------------------------------------------\n");
-
-    unw_cursor_t cursor;
-    unw_context_t context;
-
-    // Initialize cursor to current frame for local unwinding.
-    unw_getcontext(&context);
-    unw_init_local(&cursor, &context);
-
-    while (unw_step(&cursor) > 0) {
-        unw_word_t offset, pc;
-        unw_get_reg(&cursor, UNW_REG_IP, &pc);
-        if (pc == 0) {
-            break;
-        }
-        printf("0x%px:", (void *)pc);
-
-        char sym[256];
-        if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0) {
-            int status;
-            char * pRealName = abi::__cxa_demangle(sym, 0, 0, &status);
-            if (status == 0) {
-                printf(" (%s", pRealName);
-                ::free(pRealName);
-            }
-            else {
-                printf(" (%s", sym);
-            }
-
-            printf("+0x%llx)\n", offset);
-        } else {
-            printf(" -- error: unable to obtain symbol name for this frame\n");
-        }
-    }
-
-    printf("-----------------------------------------------\n");
-}
-
 FilterWheel::~FilterWheel() {
-    printf("FilterWheel::~FilterWheel() this == %p\n", this);
-    backtrace();
 }
 
 int FilterWheel::queryAbstraction(const char * pszName, void ** ppVal) {
     X2MutexLocker(m_pImpl->pMutex);
 
-    printf("queryAbstraction: pszName == %s, ppVal = %p\n", pszName, ppVal);
-    if (! ppVal) {
-        return SB_OK;
-    }
-
     *ppVal = nullptr;
 
-    if (strcmp(pszName, DriverRootInterface_Name) == 0) {
-        *ppVal = dynamic_cast<DriverInfoInterface *>(this);
-        return SB_OK;
-    }
-    else if (strcmp(pszName, LinkInterface_Name) == 0) {
-        *ppVal = dynamic_cast<LinkInterface *>(this);
-        return SB_OK;
-    }
-    else if (strcmp(pszName, HardwareInfoInterface_Name) == 0) {
-        *ppVal = dynamic_cast<HardwareInfoInterface*>(this);
-        return SB_OK;
-    }
-    else if (strcmp(pszName, DriverInfoInterface_Name)) {
-        *ppVal = dynamic_cast<DriverInfoInterface*>(this);
-        return SB_OK;
-    }
-    else if (strcmp(pszName, FilterWheelMoveToInterface_Name) == 0) {
-        *ppVal = dynamic_cast<FilterWheelMoveToInterface *>(this);
-        return SB_OK;
-    }
-    else if (strcmp(pszName, SerialPortParams2Interface_Name) == 0) {
+    if (strcmp(pszName, SerialPortParams2Interface_Name) == 0) {
         *ppVal = dynamic_cast<SerialPortParams2Interface *>(this);
-        return SB_OK;
     }
 
-    return ERR_NOT_IMPL;
+    return SB_OK;
 }
 
 void FilterWheel::driverInfoDetailedInfo(BasicStringInterface & str) const {
     str = DRIVER_NAME;
 }
 
-double FilterWheel::driverInfoVersion(void) const {
-    return 1.0;
+double FilterWheel::driverInfoVersion() const {
+    return 0.1;
 }
 
 void FilterWheel::deviceInfoNameShort(BasicStringInterface & str) const {
@@ -224,90 +211,34 @@ void FilterWheel::deviceInfoModel(BasicStringInterface & str) {
     str = DRIVER_NAME;
 }
 
-int FilterWheel::establishLink(void) {
+int FilterWheel::establishLink() {
     X2MutexLocker locker(m_pImpl->pMutex);
 
-    printf("establishLink: attempting to open: %s\n", m_pImpl->port);
-    int rc = m_pImpl->pSerial->open(m_pImpl->port);
+    int rc = m_pImpl->pSerial->open(m_pImpl->port.c_str());
 
     if (rc != SB_OK) {
-        printf("establishLink: open failed %i\n", rc);
+        printf("qhycfw3: establishLink: open '%s' failed: %i\n", m_pImpl->port.c_str(), rc);
         return rc;
     }
 
-    char buf = '0';
-    unsigned long n = 0;
-
-    //1. Write a zero to the device. This tells it to seek to position 0.
-    printf("establishLink: trying initial write\n" );
-    rc = m_pImpl->pSerial->writeFile((void *)&buf, sizeof(buf), n);
-
+    rc = m_pImpl->writeAndWaitForEcho('0');
     if (rc != SB_OK) {
-        printf("establishLink: initial write failed: %i\n", rc);
+        printf("qhycfw3: establishLink: initial write to device failed: %i\n", rc);
         m_pImpl->pSerial->purgeTxRx();
         m_pImpl->pSerial->close();
         return rc;
     }
-
-    printf("establishLink: flushing send buffer\n");
-    rc = m_pImpl->pSerial->flushTx();
-
-    if (rc != SB_OK) {
-        printf("establishLink: flushing send buffer failed: %i\n", rc);
-        m_pImpl->pSerial->purgeTxRx();
-        m_pImpl->pSerial->close();
-    }
-    //2. Wait for up to 2 seconds to get a 0 back. This means we have successfully seeked to position 0. If we don't
-    //get back a success, close the serial port and return a failure code.
-    buf = 0;
-    rc = m_pImpl->pSerial->readFile((void *)&buf, sizeof(buf), n, 2000);
-
-    if (rc != SB_OK || n != 1) {
-        printf("establishLink: read after initial write failed: %i\n", rc);
-        m_pImpl->pSerial->purgeTxRx();
-        m_pImpl->pSerial->close();
-        return rc;
-    }
-
-    printf("establishLink: initial read succeeded\n");
 
     //3. If we have the number of positions set to "auto", try to determine the number of positions.
     if (m_pImpl->numPositions <= 0) {
-        int i = 0;
+        printf("qhycfw3: establishLink: searching for the number of filter slots\n");
+        int i = 1;
         for (; i < MAX_NUM_POSITIONS; ++i) {
-            if (i <= 9) {
-                buf = '0' + i;
-            }
-            else {
-                buf = 'A' + (i - 10);
-            }
-            printf("establishLink: writing value '%c'\n", buf);
+            char expected = toCommand(i);
 
-            rc = m_pImpl->pSerial->writeFile((void *)&buf, sizeof(buf), n);
+            rc = m_pImpl->writeAndWaitForEcho(expected);
+
             if (rc != SB_OK) {
-                printf("establishLink: writing value %c failed: %i\n", buf, rc);
-                m_pImpl->pSerial->purgeTxRx();
-                m_pImpl->pSerial->close();
-                return rc;
-            }
-
-            rc = m_pImpl->pSerial->flushTx();
-            if (rc != SB_OK) {
-                printf(
-                    "establishLink: flushing the write buffer failed. Stopping search for number of devices: %i. i == %i\n",
-                    rc,
-                    i
-                );
-                break;
-            }
-
-            rc = m_pImpl->pSerial->readFile((void *)&buf, sizeof(buf), n, 1000);
-            if (rc != SB_OK || n != 1) {
-                printf(
-                    "establishLink: reading from the device failed. Stopping search for number of devices: %i. i == %i\n",
-                    rc,
-                    i
-                );
                 break;
             }
         }
@@ -315,42 +246,53 @@ int FilterWheel::establishLink(void) {
         rc = m_pImpl->pSettings->writeInt(PARENT_KEY, NUM_POSITIONS_KEY, m_pImpl->numPositions);
 
         if (rc != SB_OK) {
-            printf("establishLink: call to pSettings->writeInt failed: %i\n", rc);
+            printf("qhycfw3: establishLink: failed to serialize number of positions to settings file: %i\n", rc);
             m_pImpl->pSerial->purgeTxRx();
             m_pImpl->pSerial->close();
             return rc;
         }
+        else {
+            printf(
+                "qhycfw3: establishLink: search completed. number of filter wheel positions == %i\n",
+                m_pImpl->numPositions
+            );
+        }
+
+        rc = m_pImpl->writeAndWaitForEcho('0');
+        if (rc != SB_OK) {
+            printf("qhycfw3: establishLink: reset to position 0 failed: %i\n", rc);
+            return rc;
+        }
+    }
+    else {
+        printf("qhycfw3: establishLink: using cached number of filter slots %i\n", m_pImpl->numPositions);
     }
 
-    printf("establishLink: returning true. Num positions == %i\n", m_pImpl->numPositions);
     m_pImpl->linked = true;
 
     return SB_OK;
 }
 
-int FilterWheel::terminateLink(void) {
+int FilterWheel::terminateLink() {
     X2MutexLocker locker(m_pImpl->pMutex);
 
     if (m_pImpl->linked) {
-        printf("terminateLink: terminating link\n");
         m_pImpl->pSerial->purgeTxRx();
         m_pImpl->pSerial->close();
         m_pImpl->linked = false;
     }
-    else {
-        printf("terminateLink: not linked");
-    }
     return SB_OK;
 }
 
-bool FilterWheel::isLinked(void) const {
+bool FilterWheel::isLinked() const {
     X2MutexLocker locker(m_pImpl->pMutex);
     return m_pImpl->linked;
 }
 
 int FilterWheel::filterCount(int & nCount) {
     X2MutexLocker locker(m_pImpl->pMutex);
-    return m_pImpl->numPositions;
+    nCount = m_pImpl->numPositions;
+    return SB_OK;
 }
 
 int FilterWheel::defaultFilterName(const int & nIndex, BasicStringInterface & strFilterNameOut) {
@@ -359,32 +301,70 @@ int FilterWheel::defaultFilterName(const int & nIndex, BasicStringInterface & st
 }
 
 int FilterWheel::startFilterWheelMoveTo(const int & nTargetPosition) {
-    return ERR_NOT_IMPL;
+    X2MutexLocker locker(m_pImpl->pMutex);
+
+    if (m_pImpl->moving) {
+        return ERR_CMD_IN_PROGRESS_FW;
+    }
+
+    if (nTargetPosition < 0 || nTargetPosition >= m_pImpl->numPositions) {
+        return ERR_INDEX_OUT_OF_RANGE;
+    }
+    m_pImpl->currentCommand = toCommand(nTargetPosition);
+
+    int rc = m_pImpl->write(m_pImpl->currentCommand);
+    m_pImpl->moving = (rc == SB_OK);
+    return rc;
 }
 
 int FilterWheel::isCompleteFilterWheelMoveTo(bool & bComplete) const {
-    return ERR_NOT_IMPL;
+    X2MutexLocker locker(m_pImpl->pMutex);
+
+    if (!m_pImpl->moving) {
+        return ERR_CMDFAILED;
+    }
+
+    int rc = m_pImpl->read(m_pImpl->currentCommand);
+
+    if (rc == SB_OK) {
+        bComplete = true;
+        return SB_OK;
+    }
+    bComplete = false;
+    return ERR_CMDFAILED;
 }
 
-int FilterWheel::endFilterWheelMoveTo(void) {
-    return ERR_NOT_IMPL;
+int FilterWheel::endFilterWheelMoveTo() {
+    X2MutexLocker locker(m_pImpl->pMutex);
+    if (m_pImpl->moving) {
+        m_pImpl->moving = false;
+        return SB_OK;
+    }
+    return ERR_CMDFAILED;
 }
 
-int FilterWheel::abortFilterWheelMoveTo(void) {
+int FilterWheel::abortFilterWheelMoveTo() {
     return ERR_NOT_IMPL;
 }
 
 void FilterWheel::portName(BasicStringInterface & str) const {
-    printf("portName\n");
     X2MutexLocker lock(m_pImpl->pMutex);
-    str = m_pImpl->port;
+    try {
+        str = m_pImpl->port.c_str();
+    }
+    catch(...) {
+
+    }
 }
 
 void FilterWheel::setPortName(const char * szPort) {
-    printf("setPortName: %s\n", szPort);
     X2MutexLocker lock(m_pImpl->pMutex);
+    try {
+        m_pImpl->port = szPort;
+    }
+    catch(...) {
 
-    strncpy(m_pImpl->port, szPort, sizeof(m_pImpl->port));
+    }
 }
 
 unsigned int FilterWheel::baudRate() const {
@@ -407,4 +387,11 @@ void FilterWheel::setParity(const SerXInterface::Parity & parity) {
 
 bool FilterWheel::isParityFixed() const {
     return true;
+}
+
+char FilterWheel::toCommand(int targetPosition) {
+    if (targetPosition < 10) {
+        return '0' + targetPosition;
+    }
+    return 'A' + (targetPosition - 10);
 }

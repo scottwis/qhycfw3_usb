@@ -37,21 +37,21 @@ public:
 
     int queryAbstraction(const char * pszName, void ** ppVal) override;
     void driverInfoDetailedInfo(BasicStringInterface & str) const override;
-    double driverInfoVersion(void) const override;
+    double driverInfoVersion() const override;
     void deviceInfoNameShort(BasicStringInterface & str) const override;
     void deviceInfoNameLong(BasicStringInterface & str) const override;
     void deviceInfoDetailedDescription(BasicStringInterface & str) const override;
     void deviceInfoFirmwareVersion(BasicStringInterface & str) override;
     void deviceInfoModel(BasicStringInterface & str) override;
-    int establishLink(void) override;
-    int terminateLink(void) override;
-    bool isLinked(void) const override;
+    int establishLink() override;
+    int terminateLink() override;
+    bool isLinked() const override;
     int filterCount(int & nCount) override;
     int defaultFilterName(const int & nIndex, BasicStringInterface & strFilterNameOut) override;
     int startFilterWheelMoveTo(const int & nTargetPosition) override;
     int isCompleteFilterWheelMoveTo(bool & bComplete) const override;
-    int endFilterWheelMoveTo(void) override;
-    int abortFilterWheelMoveTo(void) override;
+    int endFilterWheelMoveTo() override;
+    int abortFilterWheelMoveTo() override;
     void portName(BasicStringInterface & str) const override;
     void setPortName(const char * szPort) override;
     unsigned int baudRate() const override;
@@ -63,4 +63,5 @@ public:
 private:
     class Impl;
     std::shared_ptr<Impl> m_pImpl;
+    char toCommand(int targetPosition);
 };

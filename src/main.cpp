@@ -33,7 +33,6 @@ extern "C" EXPORT int sbPlugInFactory2(
             pTickCounter
         );
 
-        printf("sbPluginFactory2: *ppObjectOut = %p\n", *ppObjectOut);
         return SB_OK;
     }
     catch (...) {
