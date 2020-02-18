@@ -19,6 +19,7 @@ pkgbuild \
   --sign "${SIGN_IDENTITY}" \
   --version 0.1.${REVISION} \
   --scripts ${DIRNAME}/scripts \
+  --timestamp \
   ${BINARY_DIR}/QhyCfw3Usb_x2.pkg
 
 pkgutil --check-signature ${BINARY_DIR}/QhyCfw3Usb_x2.pkg

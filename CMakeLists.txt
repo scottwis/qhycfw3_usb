@@ -16,7 +16,7 @@ if (APPLE)
         add_custom_command(
             TARGET qhycfw3_usb
             POST_BUILD
-            COMMAND codesign -s "${CODE_SIGNING_IDENTITY}" "$<TARGET_FILE:qhycfw3_usb>"
+            COMMAND codesign -s "${CODE_SIGNING_IDENTITY}" "$<TARGET_FILE:qhycfw3_usb>" --timestamp
             VERBATIM
         )
     endif()

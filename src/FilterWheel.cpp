@@ -11,7 +11,6 @@
 #include <string>
 #include "FilterWheel.h"
 
-static const char * DRIVER_NAME = "QHYCFW3 USB X2 Filter Wheel Driver";
 static const char * PARENT_KEY = "qhycfw3-usb";
 static const char * PORT_KEY = "port";
 static const char * NUM_POSITIONS_KEY = "positions";
@@ -184,7 +183,7 @@ int FilterWheel::queryAbstraction(const char * pszName, void ** ppVal) {
 }
 
 void FilterWheel::driverInfoDetailedInfo(BasicStringInterface & str) const {
-    str = DRIVER_NAME;
+    str = "none";
 }
 
 double FilterWheel::driverInfoVersion() const {
@@ -192,23 +191,23 @@ double FilterWheel::driverInfoVersion() const {
 }
 
 void FilterWheel::deviceInfoNameShort(BasicStringInterface & str) const {
-    str = DRIVER_NAME;
+    str = "QHYCFW3 USB";
 }
 
 void FilterWheel::deviceInfoNameLong(BasicStringInterface & str) const {
-    str = DRIVER_NAME;
+    str = "QHYCFW3 USB";
 }
 
 void FilterWheel::deviceInfoDetailedDescription(BasicStringInterface & str) const {
-    str = DRIVER_NAME;
+    str = "filter wheel";
 }
 
 void FilterWheel::deviceInfoFirmwareVersion(BasicStringInterface & str) {
-    str = DRIVER_NAME;
+    str = "unknown";
 }
 
 void FilterWheel::deviceInfoModel(BasicStringInterface & str) {
-    str = DRIVER_NAME;
+    str = "qhycfw3";
 }
 
 int FilterWheel::establishLink() {
