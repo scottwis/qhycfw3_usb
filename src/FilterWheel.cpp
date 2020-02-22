@@ -7,6 +7,7 @@
 #include <liscensedinterfaces/mutexinterface.h>
 #include <liscensedinterfaces/tickcountinterface.h>
 #include <liscensedinterfaces/sberrorx.h>
+#include <liscensedinterfaces/x2guiinterface.h>
 #include <stdio.h>
 #include <string>
 #include "FilterWheel.h"
@@ -179,6 +180,13 @@ int FilterWheel::queryAbstraction(const char * pszName, void ** ppVal) {
         *ppVal = dynamic_cast<SerialPortParams2Interface *>(this);
     }
 
+    if (strcmp(pszName, ModalSettingsDialogInterface_Name) == 0) {
+        *ppVal = dynamic_cast<ModalSettingsDialogInterface *>(this);
+    }
+
+    if (strcmp(pszName, X2GUIEventInterface_Name) == 0) {
+        *ppVal = dynamic_cast<X2GUIEventInterface *>(this);
+    }
     return SB_OK;
 }
 
@@ -393,4 +401,44 @@ char FilterWheel::toCommand(int targetPosition) {
         return '0' + targetPosition;
     }
     return 'A' + (targetPosition - 10);
+}
+
+int FilterWheel::initModalSettingsDialog() {
+    return SB_OK;
+}
+
+int FilterWheel::execModalSettingsDialog() {
+    X2ModalUIUtil uiutil(this, m_pImpl->pTheSky);
+
+    auto pUi = uiutil.X2UI();
+    int rc  = pUi->loadUserInterface("qhycfw3_usb.ui", deviceType(),m_pImpl->instanceNum);
+
+    if (rc != SB_OK) {
+        return rc;
+    }
+
+    X2MutexLocker locker(m_pImpl->pMutex);
+    auto pUiEx = pUi->X2DX();
+
+    if (!pUiEx) {
+        return ERR_CMDFAILED;
+    }
+    pUiEx->setCurrentIndex("comboBox", m_pImpl->numPositions);
+
+    bool ok = false;
+    rc = pUi->exec(ok);
+
+    if (rc == SB_OK) {
+        return m_pImpl->pSettings->writeInt(PARENT_KEY, NUM_POSITIONS_KEY, m_pImpl->numPositions);
+    }
+    return rc;
+}
+
+void FilterWheel::uiEvent(X2GUIExchangeInterface * pUiEx, const char * pszEvent) {
+    if (strcmp(pszEvent, "on_pushButtonOK_clicked") == 0) {
+        m_pImpl->numPositions = pUiEx->currentIndex("comboBox");
+        if (m_pImpl->numPositions < 0) {
+            m_pImpl->numPositions = 0;
+        }
+    }
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <liscensedinterfaces/filterwheeldriverinterface.h>
+#include <liscensedinterfaces/x2guiinterface.h>
+#include <liscensedinterfaces/modalsettingsdialoginterface.h>
 #include <liscensedinterfaces/serialportparams2interface.h>
 
 #include <memory>
@@ -13,7 +15,11 @@ class LoggerInterface;
 class MutexInterface;
 class TickCountInterface;
 
-class FilterWheel : public FilterWheelDriverInterface, public SerialPortParams2Interface
+class FilterWheel :
+    public FilterWheelDriverInterface,
+    public SerialPortParams2Interface,
+    public ModalSettingsDialogInterface,
+    public X2GUIEventInterface
 {
 public:
     FilterWheel(
@@ -60,6 +66,9 @@ public:
     SerXInterface::Parity parity() const override;
     void setParity(const SerXInterface::Parity & parity) override;
     bool isParityFixed() const override;
+    int initModalSettingsDialog() override;
+    int execModalSettingsDialog() override;
+    void uiEvent(X2GUIExchangeInterface * pUiEx, const char * pszEvent) override;
 private:
     class Impl;
     std::shared_ptr<Impl> m_pImpl;

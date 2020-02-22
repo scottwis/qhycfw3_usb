@@ -7,6 +7,7 @@ FILE(GLOB_RECURSE X2_INTERFACES liscensedinterfaces/*.h)
 FILE(GLOB HEADERS src/*.h)
 FILE(GLOB SOURCES src/*.cpp)
 FILE(GLOB_RECURSE INSTALLER_SOURCES installer/*)
+set(RESOURCE_SOURCES qhycfw3_usb.ui)
 
 add_library(qhycfw3_usb SHARED ${X2_INTERFACES} ${SOURCES} ${HEADERS})
 include_directories(src ${PROJECT_SOURCE_DIR})
@@ -24,7 +25,7 @@ if (APPLE)
     if (PACKAGE_SIGNING_IDENTITY)
         add_custom_command(
             OUTPUT qhycfw3_usb.pkg
-            DEPENDS $<TARGET_FILE:qhycfw3_usb> ${INSALLER_SOURCES}
+            DEPENDS $<TARGET_FILE:qhycfw3_usb> ${INSALLER_SOURCES} ${RESOURCE_SOURCES}
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/installer/build.sh "${CMAKE_CURRENT_BINARY_DIR}" "${PACKAGE_SIGNING_IDENTITY}"
             VERBATIM
         )
@@ -36,6 +37,6 @@ if (APPLE)
         )
         add_dependencies(installer qhycfw3_usb)
 
-
+        install(CODE "execute_process(COMMAND sudo installer -pkg ${CMAKE_CURRENT_BINARY_DIR}/qhycfw3_usb.pkg -target /Applications)" )
     endif()
 endif()

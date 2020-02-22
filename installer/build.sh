@@ -12,7 +12,7 @@ REVISION="$(git rev-list HEAD --count)"
 mkdir -p ${TARGET_DIR}
 cp "${DIRNAME}/../filterwheellist QHYCFW3.txt" "${TARGET_DIR}"
 cp "${BINARY_DIR}/libqhycfw3_usb.dylib" "${TARGET_DIR}"
-
+cp "${DIRNAME}/../qhycfw3_usb.ui" "${TARGET_DIR}"
 pkgbuild \
   --root ROOT \
   --identifier com.scottdw2.QhyCfw3Usb_X2 \
@@ -20,7 +20,7 @@ pkgbuild \
   --version 0.1.${REVISION} \
   --scripts ${DIRNAME}/scripts \
   --timestamp \
-  ${BINARY_DIR}/QhyCfw3Usb_x2.pkg
+  ${BINARY_DIR}/qhycfw3_usb.pkg
 
-pkgutil --check-signature ${BINARY_DIR}/QhyCfw3Usb_x2.pkg
+pkgutil --check-signature ${BINARY_DIR}/qhycfw3_usb.pkg
 rm -rf ROOT
