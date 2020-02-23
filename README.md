@@ -5,7 +5,7 @@ the [QHYCFW3 filter wheel](https://www.qhyccd.com/index.php?m=content&c=index&a=
 running in USB mode. This enables you to control the filter wheel from
 [The SkyX Pro](http://www.bisque.com/sc/pages/TheSkyX-Professional-Edition.aspx).
 
-The built-in TSX driver for the filtwheel only works when tethered to
+The built-in TSX driver for the filter wheel only works when tethered to
 a QHY camera, and then appears to only work when run on Windows under
 ASCOM. See [here](http://www.bisque.com/sc/forums/t/35821.aspx) for details.
 
