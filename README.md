@@ -35,4 +35,4 @@ will have to build and install the driver your self.
 ## Windows
 
 This may work under Windows, but I have not tested it yet. YMMV. You
-will need to get the [virtual com port drivers]((https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers).
+will need to get the [virtual com port drivers](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers).
