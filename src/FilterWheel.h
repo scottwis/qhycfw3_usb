@@ -72,5 +72,4 @@ public:
 private:
     class Impl;
     std::shared_ptr<Impl> m_pImpl;
-    char toCommand(int targetPosition);
 };

@@ -19,6 +19,8 @@ static const char * NUM_POSITIONS_KEY = "positions";
 static const int DEFAULT_NUM_POSITIONS = 0;
 static const int MAX_NUM_POSITIONS = 16;
 
+static char toCommand(int targetPosition);
+
 #if defined(_WIN32)
 static const char * DEF_PORT_NAME = "COM1";
 #elif defined(__APPLE__)
@@ -386,7 +388,7 @@ bool FilterWheel::isParityFixed() const {
     return true;
 }
 
-char FilterWheel::toCommand(int targetPosition) {
+static char toCommand(int targetPosition) {
     if (targetPosition < 10) {
         return '0' + targetPosition;
     }
