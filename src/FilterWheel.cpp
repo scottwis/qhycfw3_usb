@@ -10,6 +10,7 @@
 #include <liscensedinterfaces/x2guiinterface.h>
 #include <stdio.h>
 #include <string>
+#include <memory>
 #include "FilterWheel.h"
 
 static const char * PARENT_KEY = "qhycfw3-usb";
@@ -53,18 +54,8 @@ public:
     {
     }
 
-    ~Impl() {
-        delete pSerial;
-        delete pTheSky;
-        delete pSleeper;
-        delete pSettings;
-        delete pLogger;
-        delete pMutex;
-        delete pTickCounter;
-    }
-
     void loadSettings() {
-        X2MutexLocker lock(pMutex);
+        X2MutexLocker lock(pMutex.get());
         char buf[NAME_MAX];
         memset(buf, 0, sizeof(buf));
         pSettings->readString(PARENT_KEY, PORT_KEY, DEF_PORT_NAME, buf, sizeof(buf));
@@ -137,13 +128,13 @@ public:
     bool moving;
     char currentCommand;
 
-    SerXInterface * pSerial;
-    TheSkyXFacadeForDriversInterface * pTheSky;
-    SleeperInterface * pSleeper;
-    BasicIniUtilInterface * pSettings;
-    LoggerInterface * pLogger;
-    MutexInterface * pMutex;
-    TickCountInterface * pTickCounter;
+    std::unique_ptr<SerXInterface> pSerial;
+    std::unique_ptr<TheSkyXFacadeForDriversInterface> pTheSky;
+    std::unique_ptr<SleeperInterface> pSleeper;
+    std::unique_ptr<BasicIniUtilInterface> pSettings;
+    std::unique_ptr<LoggerInterface> pLogger;
+    std::unique_ptr<MutexInterface> pMutex;
+    std::unique_ptr<TickCountInterface> pTickCounter;
 };
 
 FilterWheel::FilterWheel(
@@ -168,11 +159,10 @@ FilterWheel::FilterWheel(
     m_pImpl->loadSettings();
 }
 
-FilterWheel::~FilterWheel() {
-}
+FilterWheel::~FilterWheel() = default;
 
 int FilterWheel::queryAbstraction(const char * pszName, void ** ppVal) {
-    X2MutexLocker(m_pImpl->pMutex);
+    X2MutexLocker locker(m_pImpl->pMutex.get());
 
     *ppVal = nullptr;
 
@@ -219,7 +209,7 @@ void FilterWheel::deviceInfoModel(BasicStringInterface & str) {
 }
 
 int FilterWheel::establishLink() {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker locker(m_pImpl->pMutex.get());
 
     int rc = m_pImpl->pSerial->open(m_pImpl->port.c_str());
 
@@ -281,7 +271,7 @@ int FilterWheel::establishLink() {
 }
 
 int FilterWheel::terminateLink() {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
 
     if (m_pImpl->linked) {
         m_pImpl->pSerial->purgeTxRx();
@@ -292,12 +282,12 @@ int FilterWheel::terminateLink() {
 }
 
 bool FilterWheel::isLinked() const {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
     return m_pImpl->linked;
 }
 
 int FilterWheel::filterCount(int & nCount) {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
     nCount = m_pImpl->numPositions;
     return SB_OK;
 }
@@ -308,7 +298,7 @@ int FilterWheel::defaultFilterName(const int & nIndex, BasicStringInterface & st
 }
 
 int FilterWheel::startFilterWheelMoveTo(const int & nTargetPosition) {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
 
     if (m_pImpl->moving) {
         return ERR_CMD_IN_PROGRESS_FW;
@@ -325,7 +315,7 @@ int FilterWheel::startFilterWheelMoveTo(const int & nTargetPosition) {
 }
 
 int FilterWheel::isCompleteFilterWheelMoveTo(bool & bComplete) const {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
 
     if (!m_pImpl->moving) {
         return ERR_CMDFAILED;
@@ -342,7 +332,7 @@ int FilterWheel::isCompleteFilterWheelMoveTo(bool & bComplete) const {
 }
 
 int FilterWheel::endFilterWheelMoveTo() {
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
     if (m_pImpl->moving) {
         m_pImpl->moving = false;
         return SB_OK;
@@ -355,7 +345,7 @@ int FilterWheel::abortFilterWheelMoveTo() {
 }
 
 void FilterWheel::portName(BasicStringInterface & str) const {
-    X2MutexLocker lock(m_pImpl->pMutex);
+    X2MutexLocker lock(m_pImpl->pMutex.get());
     try {
         str = m_pImpl->port.c_str();
     }
@@ -365,7 +355,7 @@ void FilterWheel::portName(BasicStringInterface & str) const {
 }
 
 void FilterWheel::setPortName(const char * szPort) {
-    X2MutexLocker lock(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
     try {
         m_pImpl->port = szPort;
     }
@@ -408,7 +398,7 @@ int FilterWheel::initModalSettingsDialog() {
 }
 
 int FilterWheel::execModalSettingsDialog() {
-    X2ModalUIUtil uiutil(this, m_pImpl->pTheSky);
+    X2ModalUIUtil uiutil(this, m_pImpl->pTheSky.get());
 
     auto pUi = uiutil.X2UI();
     int rc  = pUi->loadUserInterface("qhycfw3_usb.ui", deviceType(),m_pImpl->instanceNum);
@@ -417,7 +407,7 @@ int FilterWheel::execModalSettingsDialog() {
         return rc;
     }
 
-    X2MutexLocker locker(m_pImpl->pMutex);
+    X2MutexLocker lokcer(m_pImpl->pMutex.get());
     auto pUiEx = pUi->X2DX();
 
     if (!pUiEx) {
